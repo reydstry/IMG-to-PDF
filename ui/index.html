@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to PDF Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px 20px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(17, 153, 142, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .status-info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .status-error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .status-loading {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .file-list {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 15px 0;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .file-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .icon {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+    <script type="module">
+      import { invoke } from "https://esm.sh/@tauri-apps/api@2.0.0/core";
+      import { open, save } from "https://esm.sh/@tauri-apps/plugin-dialog@2.0.0";
+
+      let imagePaths = [];
+      let outputPath = '';
+      let orientation = 'portrait';
+      let margin = 'none';
+
+      const selectImagesBtn = document.getElementById('selectImages');
+      const selectOutputBtn = document.getElementById('selectOutput');
+      const convertBtn = document.getElementById('convert');
+      const statusDiv = document.getElementById('status');
+      const fileListDiv = document.getElementById('fileList');
+
+      const orientationInputs = document.querySelectorAll('input[name="orientation"]');
+      orientationInputs.forEach(input => {
+        input.addEventListener('change', () => {
+          orientation = input.value;
+        });
+      });
+
+      const marginInputs = document.querySelectorAll('input[name="margin"]');
+      marginInputs.forEach(input => {
+        input.addEventListener('change', () => {
+          margin = input.value;
+        });
+      });
+
+      function setStatus(message, type = 'info') {
+        statusDiv.textContent = message;
+        statusDiv.className = `status-${type}`;
+      }
+
+      function updateFileList() {
+        if (imagePaths.length > 0) {
+          fileListDiv.style.display = 'block';
+          fileListDiv.innerHTML = imagePaths.map((path, index) => {
+            const fileName = path.split('\\').pop().split('/').pop();
+            return `<div class="file-item">${index + 1}. ${fileName}</div>`;
+          }).join('');
+        } else {
+          fileListDiv.style.display = 'none';
+        }
+      }
+
+      function checkReady() {
+        const ready = imagePaths.length > 0 && outputPath;
+        convertBtn.disabled = !ready;
+        selectOutputBtn.disabled = imagePaths.length === 0;
+      }
+
+      selectImagesBtn.addEventListener('click', async () => {
+        try {
+          const selected = await open({
+            multiple: true,
+            filters: [{
+              name: 'Images',
+              extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']
+            }]
+          });
+
+          if (selected) {
+            imagePaths = Array.isArray(selected) ? selected : [selected];
+            setStatus(`✅ ${imagePaths.length} gambar dipilih`, 'success');
+            updateFileList();
+            checkReady();
+          }
+        } catch (error) {
+          setStatus(`❌ Error: ${error}`, 'error');
+        }
+      });
+
+      selectOutputBtn.addEventListener('click', async () => {
+        try {
+          const selected = await save({
+            defaultPath: 'merged.pdf',
+            filters: [{
+              name: 'PDF',
+              extensions: ['pdf']
+            }]
+          });
+
+          if (selected) {
+            outputPath = selected;
+            setStatus(`💾 Output: ${outputPath.split('\\').pop().split('/').pop()}`, 'info');
+            checkReady();
+          }
+        } catch (error) {
+          setStatus(`❌ Error: ${error}`, 'error');
+        }
+      });
+
+      convertBtn.addEventListener('click', async () => {
+        setStatus('⏳ Sedang mengonversi...', 'loading');
+        convertBtn.disabled = true;
+
+        try {
+          const result = await invoke('convert_images_to_pdf', {
+            imagePaths,
+            outputPdfPath: outputPath,
+            orientation,
+            margin,
+          });
+
+          setStatus(`✅ ${result}`, 'success');
+
+          setTimeout(() => {
+            imagePaths = [];
+            outputPath = '';
+            updateFileList();
+            checkReady();
+            setStatus('');
+          }, 3000);
+        } catch (error) {
+          setStatus(`❌ Error: ${error}`, 'error');
+          convertBtn.disabled = false;
+        }
+      });
+
+      setStatus('Pilih gambar untuk memulai', 'info');
+    </script>
+  </body>
+</html>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🖼️📄</div>
+        <h1>Image to PDF Converter</h1>
+        <p class="subtitle">Gabungkan beberapa gambar menjadi satu file PDF</p>
+        
+        <button id="selectImages" class="btn btn-primary">
+            📁 Pilih Gambar
+        </button>
+        
+        <div id="fileList" style="display: none;" class="file-list"></div>
+        
+        <div class="controls">
+            <h3>Pengaturan Halaman</h3>
+
+            <div class="control-group">
+                <span>Orientasi:</span>
+                <label><input type="radio" name="orientation" value="portrait" checked> Potret</label>
+                <label><input type="radio" name="orientation" value="landscape"> Lanskap</label>
+            </div>
+
+            <div class="control-group">
+                <span>Margin:</span>
+                <label><input type="radio" name="margin" value="none" checked> Tanpa</label>
+                <label><input type="radio" name="margin" value="small"> Kecil</label>
+                <label><input type="radio" name="margin" value="large"> Besar</label>
+            </div>
+        </div>
+        
+        <button id="selectOutput" class="btn btn-secondary" disabled>
+            💾 Pilih Lokasi Simpan PDF
+        </button>
+        
+        <button id="convert" class="btn btn-success" disabled>
+            ✨ Convert to PDF
+        </button>
+        
+        <div id="status"></div>
+    </div>
+    
+    <!-- <script type="module">
+        const { invoke } = window.__TAURI__.core;
+        const { open, save } = window.__TAURI__.dialog;
+        
+        let imagePaths = [];
+        let outputPath = '';
+        
+        const selectImagesBtn = document.getElementById('selectImages');
+        const selectOutputBtn = document.getElementById('selectOutput');
+        const convertBtn = document.getElementById('convert');
+        const statusDiv = document.getElementById('status');
+        const fileListDiv = document.getElementById('fileList');
+        
+        function setStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-${type}`;
+        }
+        
+        function updateFileList() {
+            if (imagePaths.length > 0) {
+                fileListDiv.style.display = 'block';
+                fileListDiv.innerHTML = imagePaths.map((path, index) => {
+                    const fileName = path.split('\\').pop().split('/').pop();
+                    return `<div class="file-item">${index + 1}. ${fileName}</div>`;
+                }).join('');
+            } else {
+                fileListDiv.style.display = 'none';
+            }
+        }
+        
+        function checkReady() {
+            const ready = imagePaths.length > 0 && outputPath;
+            convertBtn.disabled = !ready;
+            selectOutputBtn.disabled = imagePaths.length === 0;
+        }
+        
+        selectImagesBtn.addEventListener('click', async () => {
+            try {
+                const selected = await open({
+                    multiple: true,
+                    filters: [{
+                        name: 'Images',
+                        extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']
+                    }]
+                });
+                
+                if (selected) {
+                    imagePaths = Array.isArray(selected) ? selected : [selected];
+                    setStatus(`✅ ${imagePaths.length} gambar dipilih`, 'success');
+                    updateFileList();
+                    checkReady();
+                }
+            } catch (error) {
+                setStatus(`❌ Error: ${error}`, 'error');
+            }
+        });
+        
+        selectOutputBtn.addEventListener('click', async () => {
+            try {
+                const selected = await save({
+                    defaultPath: 'merged.pdf',
+                    filters: [{
+                        name: 'PDF',
+                        extensions: ['pdf']
+                    }]
+                });
+                
+                if (selected) {
+                    outputPath = selected;
+                    setStatus(`💾 Output: ${outputPath.split('\\').pop().split('/').pop()}`, 'info');
+                    checkReady();
+                }
+            } catch (error) {
+                setStatus(`❌ Error: ${error}`, 'error');
+            }
+        });
+        
+        convertBtn.addEventListener('click', async () => {
+            setStatus('⏳ Sedang mengonversi...', 'loading');
+            convertBtn.disabled = true;
+            
+            try {
+                const result = await invoke('convert_images_to_pdf', {
+                    imagePaths,
+                    outputPdfPath: outputPath
+                });
+                
+                setStatus(`✅ ${result}`, 'success');
+                
+                // Reset setelah sukses
+                setTimeout(() => {
+                    imagePaths = [];
+                    outputPath = '';
+                    updateFileList();
+                    checkReady();
+                    setStatus('');
+                }, 3000);
+            } catch (error) {
+                setStatus(`❌ Error: ${error}`, 'error');
+                convertBtn.disabled = false;
+            }
+        });
+        
+        // Initial status
+        setStatus('Pilih gambar untuk memulai', 'info');
+    </script> -->
+</body>
+</html>
