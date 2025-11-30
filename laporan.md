@@ -162,25 +162,6 @@ Aplikasi IMG To PDF dirancang untuk menyelesaikan permasalahan umum yang sering 
 - **Baris 41**: **Handler generation** - menggunakan macro untuk type-safe command binding
 - **Baris 42-51**: **Closure/Lambda** dengan conditional logic yang pure
 - **Baris 52**: **Method chaining** - functional pipeline untuk app initialization
-  036
-  037 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-  038 pub fn run() {
-  039 tauri::Builder::default()
-  040 .plugin(tauri_plugin_dialog::init())
-  041 .invoke_handler(tauri::generate_handler![convert_images_to_pdf])
-  042 .setup(|app| {
-  043 if cfg!(debug_assertions) {
-  044 app.handle().plugin(
-  045 tauri_plugin_log::Builder::default()
-  046 .level(log::LevelFilter::Info)
-  047 .build(),
-  048 )?;
-  049 }
-  050 Ok(())
-  051 })
-  052 .run(tauri::generate_context!())
-  053 .expect("error while running tauri application");
-  054 }
 
 ### pdf.rs
 
