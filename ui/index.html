@@ -157,28 +157,12 @@
 
       let imagePaths = [];
       let outputPath = '';
-      let orientation = 'portrait';
-      let margin = 'none';
 
       const selectImagesBtn = document.getElementById('selectImages');
       const selectOutputBtn = document.getElementById('selectOutput');
       const convertBtn = document.getElementById('convert');
       const statusDiv = document.getElementById('status');
       const fileListDiv = document.getElementById('fileList');
-
-      const orientationInputs = document.querySelectorAll('input[name="orientation"]');
-      orientationInputs.forEach(input => {
-        input.addEventListener('change', () => {
-          orientation = input.value;
-        });
-      });
-
-      const marginInputs = document.querySelectorAll('input[name="margin"]');
-      marginInputs.forEach(input => {
-        input.addEventListener('change', () => {
-          margin = input.value;
-        });
-      });
 
       function setStatus(message, type = 'info') {
         statusDiv.textContent = message;
@@ -215,12 +199,12 @@
 
           if (selected) {
             imagePaths = Array.isArray(selected) ? selected : [selected];
-            setStatus(`✅ ${imagePaths.length} gambar dipilih`, 'success');
+            setStatus(`${imagePaths.length} gambar dipilih`, 'success');
             updateFileList();
             checkReady();
           }
         } catch (error) {
-          setStatus(`❌ Error: ${error}`, 'error');
+          setStatus(`Error: ${error}`, 'error');
         }
       });
 
@@ -236,37 +220,35 @@
 
           if (selected) {
             outputPath = selected;
-            setStatus(`💾 Output: ${outputPath.split('\\').pop().split('/').pop()}`, 'info');
+            setStatus(`Output: ${outputPath.split('\\').pop().split('/').pop()}`, 'info');
             checkReady();
           }
         } catch (error) {
-          setStatus(`❌ Error: ${error}`, 'error');
+          setStatus(`Error: ${error}`, 'error');
         }
       });
 
       convertBtn.addEventListener('click', async () => {
-        setStatus('⏳ Sedang mengonversi...', 'loading');
+        setStatus('Sedang mengonversi...', 'loading');
         convertBtn.disabled = true;
 
         try {
           const result = await invoke('convert_images_to_pdf', {
             imagePaths,
             outputPdfPath: outputPath,
-            orientation,
-            margin,
           });
 
-          setStatus(`✅ ${result}`, 'success');
+          setStatus(`${result}`, 'success');
 
           setTimeout(() => {
             imagePaths = [];
             outputPath = '';
             updateFileList();
             checkReady();
-            setStatus('');
+            setStatus('Pilih gambar untuk memulai', 'info');
           }, 3000);
         } catch (error) {
-          setStatus(`❌ Error: ${error}`, 'error');
+          setStatus(`Error: ${error}`, 'error');
           convertBtn.disabled = false;
         }
       });
@@ -278,39 +260,21 @@
 </head>
 <body>
     <div class="container">
-        <div class="icon">🖼️📄</div>
         <h1>Image to PDF Converter</h1>
         <p class="subtitle">Gabungkan beberapa gambar menjadi satu file PDF</p>
         
         <button id="selectImages" class="btn btn-primary">
-            📁 Pilih Gambar
+            Pilih Gambar
         </button>
         
         <div id="fileList" style="display: none;" class="file-list"></div>
         
-        <div class="controls">
-            <h3>Pengaturan Halaman</h3>
-
-            <div class="control-group">
-                <span>Orientasi:</span>
-                <label><input type="radio" name="orientation" value="portrait" checked> Potret</label>
-                <label><input type="radio" name="orientation" value="landscape"> Lanskap</label>
-            </div>
-
-            <div class="control-group">
-                <span>Margin:</span>
-                <label><input type="radio" name="margin" value="none" checked> Tanpa</label>
-                <label><input type="radio" name="margin" value="small"> Kecil</label>
-                <label><input type="radio" name="margin" value="large"> Besar</label>
-            </div>
-        </div>
-        
         <button id="selectOutput" class="btn btn-secondary" disabled>
-            💾 Pilih Lokasi Simpan PDF
+            Pilih Lokasi Simpan PDF
         </button>
         
         <button id="convert" class="btn btn-success" disabled>
-            ✨ Convert to PDF
+            Convert to PDF
         </button>
         
         <div id="status"></div>

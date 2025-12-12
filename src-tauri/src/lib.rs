@@ -5,9 +5,9 @@ mod image_utils;
 async fn convert_images_to_pdf(
     image_paths: Vec<String>,
     output_pdf_path: String,
-    orientation: String,
-    margin: String,
 ) -> Result<String, String> {
+    let total_start = std::time::Instant::now();
+    
     let file_bytes: Result<Vec<_>, String> = image_paths
         .iter()
         .map(|path| {
@@ -18,8 +18,12 @@ async fn convert_images_to_pdf(
     
     let file_bytes = file_bytes?;
     
-    println!("Loading {} images in parallel...", file_bytes.len());
+    println!("\n========== IMAGE TO PDF CONVERSION ==========");
+    println!("[Start] Loading {} images in parallel...", file_bytes.len());
+    
+    let load_start = std::time::Instant::now();
     let loaded_images = image_utils::load_images_parallel(file_bytes);
+    println!("[Load] All images loaded in {:.2}ms", load_start.elapsed().as_secs_f64() * 1000.0);
     
     let successful_images: Vec<_> = loaded_images
         .into_iter()
@@ -28,11 +32,11 @@ async fn convert_images_to_pdf(
             match result {
                 Ok(data) => {
                     let (_, w, h) = &data;
-                    println!("Image {} loaded: {}x{}", i + 1, w, h);
+                    println!("[Image {}] Loaded: {}x{} pixels", i + 1, w, h);
                     Some(data)
                 }
                 Err(e) => {
-                    eprintln!("Warning: {}", e);
+                    eprintln!("[Warning] {}", e);
                     None
                 }
             }
@@ -43,12 +47,9 @@ async fn convert_images_to_pdf(
         return Err("No images could be loaded".to_string());
     }
     
-    println!("Generating {} PDFs in parallel...", successful_images.len());
-    let pdf_results = image_utils::generate_pdfs_parallel(
-        successful_images,
-        &orientation,
-        &margin,
-    );
+    println!("\n[Convert] Generating {} PDFs in parallel...", successful_images.len());
+    let convert_start = std::time::Instant::now();
+    let pdf_results = image_utils::generate_pdfs_parallel(successful_images);
     
     let successful_pdfs: Vec<_> = pdf_results
         .into_iter()
@@ -67,18 +68,28 @@ async fn convert_images_to_pdf(
         return Err("No PDFs could be generated".to_string());
     }
     
+    println!("[Convert] All PDFs generated in {:.2}ms", convert_start.elapsed().as_secs_f64() * 1000.0);
+    
     let pdf_count = successful_pdfs.len();
     
-    println!("Merging {} PDFs...", pdf_count);
+    println!("\n[Merge] Merging {} PDFs...", pdf_count);
+    let merge_start = std::time::Instant::now();
     let merged_pdf = pdf::merge_pdfs(successful_pdfs)
         .map_err(|e| format!("Failed to merge PDFs: {}", e))?;
+    println!("[Merge] Completed in {:.2}ms", merge_start.elapsed().as_secs_f64() * 1000.0);
     
-    std::fs::write(&output_pdf_path, merged_pdf)
+    println!("\n[Write] Saving to: {}", output_pdf_path);
+    std::fs::write(&output_pdf_path, &merged_pdf)
         .map_err(|e| format!("Failed to write PDF: {}", e))?;
     
+    let total_elapsed = total_start.elapsed();
+    println!("[Done] Total time: {:.2}ms", total_elapsed.as_secs_f64() * 1000.0);
+    println!("==========================================\n");
+    
     Ok(format!(
-        "✅ PDF berhasil dibuat dengan {} halaman: {}",
+        "✅ PDF berhasil dibuat dengan {} halaman dalam {:.2}s: {}",
         pdf_count,
+        total_elapsed.as_secs_f64(),
         output_pdf_path
     ))
 }

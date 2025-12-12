@@ -31,20 +31,16 @@ pub fn image_data_to_dynamic_image(data: &[u8], width: u32, height: u32) -> Dyna
 
 pub fn generate_pdfs_parallel(
     image_data: Vec<(Vec<u8>, u32, u32)>,
-    orientation: &str,
-    margin: &str,
 ) -> Vec<Result<Vec<u8>, String>> {
+    println!("[Parallel] Starting PDF generation with {} threads...", rayon::current_num_threads());
+    
     image_data
         .par_iter()
         .enumerate()
         .map(|(i, data)| {
-            println!("Processing image {} in parallel...", i + 1);
-            crate::pdf::generate_single_page_pdf(
-                data.clone(),
-                orientation,
-                margin,
-            )
-            .map_err(|e| format!("Image {}: {}", i + 1, e))
+            println!("[Thread] Processing image {}...", i + 1);
+            crate::pdf::generate_single_page_pdf(data.clone(), i)
+                .map_err(|e| format!("Image {}: {}", i + 1, e))
         })
         .collect()
 }
