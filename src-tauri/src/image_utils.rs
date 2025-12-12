@@ -1,7 +1,6 @@
 use image::DynamicImage;
 use rayon::prelude::*;
 
-/// Load image dari bytes (uploaded file)
 pub fn load_image_from_bytes(
     bytes: &[u8],
 ) -> Result<(Vec<u8>, u32, u32), Box<dyn std::error::Error>> {
@@ -11,7 +10,6 @@ pub fn load_image_from_bytes(
     Ok((rgba.into_raw(), width, height))
 }
 
-/// Load multiple images in parallel
 pub fn load_images_parallel(
     image_bytes: Vec<Vec<u8>>,
 ) -> Vec<Result<(Vec<u8>, u32, u32), String>> {
@@ -24,10 +22,6 @@ pub fn load_images_parallel(
         .collect()
 }
 
-// hitung menggunakan dan tanpa menggunakan multiprocessing
-
-
-// Convert raw image data ke DynamicImage (untuk printpdf)
 pub fn image_data_to_dynamic_image(data: &[u8], width: u32, height: u32) -> DynamicImage {
     DynamicImage::ImageRgba8(
         image::RgbaImage::from_raw(width, height, data.to_vec())
@@ -35,14 +29,22 @@ pub fn image_data_to_dynamic_image(data: &[u8], width: u32, height: u32) -> Dyna
     )
 }
 
-// Convert multi image paralel
-pub fn convert_to_dynamic_images_parallel(
+pub fn generate_pdfs_parallel(
     image_data: Vec<(Vec<u8>, u32, u32)>,
-) -> Vec<DynamicImage> {
+    orientation: &str,
+    margin: &str,
+) -> Vec<Result<Vec<u8>, String>> {
     image_data
         .par_iter()
-        .map(|(data, width, height)| {
-            image_data_to_dynamic_image(data, *width, *height)
+        .enumerate()
+        .map(|(i, data)| {
+            println!("Processing image {} in parallel...", i + 1);
+            crate::pdf::generate_single_page_pdf(
+                data.clone(),
+                orientation,
+                margin,
+            )
+            .map_err(|e| format!("Image {}: {}", i + 1, e))
         })
         .collect()
 }

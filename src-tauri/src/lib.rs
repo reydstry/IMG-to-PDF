@@ -1,37 +1,86 @@
 mod pdf;
 mod image_utils;
 
-use std::fs;
-
 #[tauri::command]
 async fn convert_images_to_pdf(
     image_paths: Vec<String>,
     output_pdf_path: String,
-    orientation: String,   // "portrait" | "landscape"
-    margin: String,        // "none" | "small" | "large"
+    orientation: String,
+    margin: String,
 ) -> Result<String, String> {
-    let mut image_data = Vec::new(); // jangan memakai muttable, cari alternatif lain
+    let file_bytes: Result<Vec<_>, String> = image_paths
+        .iter()
+        .map(|path| {
+            std::fs::read(path)
+                .map_err(|e| format!("Failed to read {}: {}", path, e))
+        })
+        .collect();
     
-    // Load semua gambar
-    for path in &image_paths {
-        let bytes = fs::read(path)
-            .map_err(|e| format!("Failed to read {}: {}", path, e))?;
-        
-        let (img_bytes, width, height) = image_utils::load_image_from_bytes(&bytes)
-            .map_err(|e| format!("Failed to load image: {}", e))?;
-        println!("Loaded image: {} ({}x{})", path, width, height);
-        image_data.push((img_bytes, width, height));
+    let file_bytes = file_bytes?;
+    
+    println!("Loading {} images in parallel...", file_bytes.len());
+    let loaded_images = image_utils::load_images_parallel(file_bytes);
+    
+    let successful_images: Vec<_> = loaded_images
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, result)| {
+            match result {
+                Ok(data) => {
+                    let (_, w, h) = &data;
+                    println!("Image {} loaded: {}x{}", i + 1, w, h);
+                    Some(data)
+                }
+                Err(e) => {
+                    eprintln!("Warning: {}", e);
+                    None
+                }
+            }
+        })
+        .collect();
+    
+    if successful_images.is_empty() {
+        return Err("No images could be loaded".to_string());
     }
     
-    // Generate PDF dengan opsi orientasi & margin
-    let pdf_bytes = pdf::generate_pdf(image_data, &orientation, &margin)
-        .map_err(|e| format!("Failed to generate PDF: {}", e))?;
+    println!("Generating {} PDFs in parallel...", successful_images.len());
+    let pdf_results = image_utils::generate_pdfs_parallel(
+        successful_images,
+        &orientation,
+        &margin,
+    );
     
-    // Simpan ke file
-    fs::write(&output_pdf_path, pdf_bytes)
+    let successful_pdfs: Vec<_> = pdf_results
+        .into_iter()
+        .filter_map(|result| {
+            match result {
+                Ok(pdf_bytes) => Some(pdf_bytes),
+                Err(e) => {
+                    eprintln!("Warning: {}", e);
+                    None
+                }
+            }
+        })
+        .collect();
+    
+    if successful_pdfs.is_empty() {
+        return Err("No PDFs could be generated".to_string());
+    }
+    
+    let pdf_count = successful_pdfs.len();
+    
+    println!("Merging {} PDFs...", pdf_count);
+    let merged_pdf = pdf::merge_pdfs(successful_pdfs)
+        .map_err(|e| format!("Failed to merge PDFs: {}", e))?;
+    
+    std::fs::write(&output_pdf_path, merged_pdf)
         .map_err(|e| format!("Failed to write PDF: {}", e))?;
     
-    Ok(format!("PDF berhasil dibuat: {}", output_pdf_path))
+    Ok(format!(
+        "✅ PDF berhasil dibuat dengan {} halaman: {}",
+        pdf_count,
+        output_pdf_path
+    ))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -43,7 +92,7 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
+                        .level(log::LevelFilter::Debug)
                         .build(),
                 )?;
             }
