@@ -10,7 +10,7 @@ async fn convert_images_to_pdf(
     orientation: String,   // "portrait" | "landscape"
     margin: String,        // "none" | "small" | "large"
 ) -> Result<String, String> {
-    let mut image_data = Vec::new();
+    let mut image_data = Vec::new(); // jangan memakai muttable, cari alternatif lain
     
     // Load semua gambar
     for path in &image_paths {

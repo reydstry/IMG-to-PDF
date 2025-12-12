@@ -38,7 +38,7 @@ pub fn generate_pdf(
     let (doc, page1, layer1) =
         PdfDocument::new("Merged Images", page_w, page_h, "Layer 1");
 
-    let mut current_page = doc.get_page(page1);
+    let mut current_page = doc.get_page(page1); // hindari pakai mutable 
     let mut current_layer = current_page.get_layer(layer1);
 
     for (i, (img_data, width, height)) in images.iter().enumerate() {
@@ -46,19 +46,19 @@ pub fn generate_pdf(
             let (p, l) = doc.add_page(page_w, page_h, format!("Page {}", i + 1));
             current_page = doc.get_page(p);
             current_layer = current_page.get_layer(l);
-        }
+        } // buatkan proses lebih clean
 
         let dyn_image = image_data_to_dynamic_image(img_data, *width, *height);
-        let rgba = dyn_image.to_rgba8();
+        let rgba = dyn_image.to_rgba8(); // bisa di bentuk fungsi tersendiri
         let (w, h) = rgba.dimensions();
         let raw_rgba = rgba.into_raw();
 
-        let mut raw_rgb = Vec::with_capacity((w * h * 3) as usize);
+        let mut raw_rgb = Vec::with_capacity((w * h * 3) as usize); 
         for chunk in raw_rgba.chunks(4) {
             raw_rgb.push(chunk[0]);
             raw_rgb.push(chunk[1]);
             raw_rgb.push(chunk[2]);
-        }
+        } // kalau bisa tidak 4 bungkus fungsi
 
         let image = Image::from(ImageXObject {
             width: Px(w as usize),
@@ -72,7 +72,7 @@ pub fn generate_pdf(
         });
 
         // ukuran gambar
-        let img_w = w as f32;
+        let img_w = w as f32; // kenapa ga langsung dipanggil langsung
         let img_h = h as f32;
 
         // Tidak ada scaling tambahan: 1px gambar ~ 1mm di PDF
@@ -100,12 +100,12 @@ pub fn generate_pdf(
                 scale_x: Some(scale),
                 scale_y: Some(scale),
                 rotate: None,
-                dpi: Some(96.0),
+                dpi: Some(96.0), // maksud dpi apa, dibungkus dalam fungsi
             },
         );
     }
 
     let mut pdf_bytes = Vec::new();
-    doc.save(&mut BufWriter::new(&mut pdf_bytes))?;
+    doc.save(&mut BufWriter::new(&mut pdf_bytes))?; // hindari pakai mutable 
     Ok(pdf_bytes)
 }
